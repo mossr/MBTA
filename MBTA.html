@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<meta charset="utf8-">
+
+<style>
+
+body {
+	font: 10px sans-serif;
+}
+
+</style>
+
+<body>
+	<title>MBTA | Moss</title>
+
+	<div id="mbta_div">
+		<svg id="mbta_svg" style="float:left;">
+		</svg>
+	</div>
+
+	<script src="http://localhost:8888/library/d3.v3.js"></script>
+	<script src="http://localhost:8888/library/jquery-1.9.1.js"></script>
+
+<script type="text/javascript">
+
+var margin = {top: 50, right:50, bottom: 50, left: 50},
+	width = 800 - margin.left - margin.right,
+	height = 800 - margin.top - margin.bottom
+	total_margin = (margin.top + margin.right + margin.bottom + margin.left);
+
+var x = d3.scale.linear()
+	.range([0, width]);
+
+var y = d3.scale.linear()
+	.range([height, 0]);
+
+var line = d3.svg.line()
+	.x(function(d) { return x(d.x); })
+	.y(function(d) { return y(d.y); });
+
+var svg = d3.select("#mbta_svg")
+	.attr("width", width + margin.left + margin.right)
+	.attr("height", height + margin.top + margin.bottom)
+	.append("g")
+		.attr("transform", "translate(" + margin.left + "," + -total_margin + ")");
+
+var grad = svg.append("defs").append("linearGradient").attr("id", "grad")
+              .attr("x1", "0%").attr("x2", "0%").attr("y1", "100%").attr("y2", "0%");
+grad.append("stop").attr("offset", "50%").style("stop-color", "lightblue");
+grad.append("stop").attr("offset", "50%").style("stop-color", "white");
+
+var r = 8;
+var _r = 12;
+
+var c_red = "red";
+var c_orange = "orange";
+var c_green = "#00B050";
+var c_blue = "#0070C0";
+var c_gray = "#BFBFBF";
+
+
+function generate_graph() {
+	d3.csv("http://localhost:8888/data/mbta_data.csv", function(error, data) {
+		var data_and_keys = data_parser(data);
+
+		data = data_and_keys.data;
+		var keys = data_and_keys.keys;
+
+		var xd = d3.extent(data, function(d) { return d.x; });
+		var yd = d3.extent(data, function(d) { return d.y ; });
+		xd[1] < yd[1] ? xd[1] = yd[1] : yd[1] = xd[1];
+		x.domain(xd);
+		y.domain(yd);
+
+		svg.selectAll(".t-stop")
+			 .data(data)
+			.enter().append("circle")
+				.attr("class", "stop")
+				.attr("r", function(d) { return d.r; })
+				.attr("cx", function(d) { return x(d.x); })
+				.attr("cy", function(d) { return y(d.y); })
+				.style("fill", function(d) { return color(d); })
+				.style("stroke", function(d) { return color(d); })
+				.on("click", function(d) { 
+					var prev = d3.select(this).attr("r");
+  					d3.select(this).attr("r", prev == d.r ? _r : d.r);
+  				})
+				.append("title")
+					.text(function(d) { return d.name + " -> [" + d.x + "," + d.y + "]"; });
+				
+	});
+}
+
+function data_parser(d) {
+	var data_keys = Object.keys(d[0]);
+	var d_size = data_keys.length;
+	var shadow_offset = 0.075;
+	var _d = [];
+	var _h = [];
+
+	d.forEach(function(d) {
+		for(var k=0;k<d_size;k++){
+			var key = data_keys[k];
+
+			var coord = d[key].split("x");
+			var x = +coord[0];
+			var y = +coord[1];
+			var hash = hash_func(x, y);
+
+			if(x && y){
+				var dr = _h.indexOfAll(hash).length;
+				if(dr < 1) // Add drop shadow
+					_d.push({name:key, x:x+shadow_offset, y:y-shadow_offset, r:r-(dr*3), hash:hash, shadow:true});
+				_d.push({name:key, x:x, y:y, r:r-(dr*3), hash:hash});
+				_h.push(hash);
+			}
+		}
+	});
+
+	_d.forEach(function(d) {
+		// println(d);
+	});
+
+	return {data:_d, keys:data_keys};
+}
+
+function hash_func(x, y) {
+	return (Math.pow(x,Math.E)+Math.pow(y, Math.E))/Math.pow(x,y);
+}
+
+Array.prototype.contains = function(value) {
+	return this.indexOf(value) != -1;
+}
+
+Array.prototype.indexOfAll = function(value) {
+	var pos = 0;
+	var num = [];
+	var i = -1;
+
+	while(pos != -1) {
+		pos = this.indexOf(value, i + 1);
+		if(pos != -1)
+			num.push(pos);
+		i = pos;
+	}
+	return num;
+}
+
+function color(d) {
+	var c = d.name.split("-")[0];
+
+	var c_return = (
+		c == "red" ? c_red
+			:
+		c == "orange" ? c_orange 
+			:
+		c == "green" ? c_green 
+			:
+		c == "blue" ? c_blue
+			:
+		c == "gray" ? c_gray
+			: "black"
+	);
+
+	if(d.shadow)
+		return d3.rgb(c_return).darker();
+	return c_return;
+}
+
+function println() {
+	var n = arguments.length;
+	for(var i=0;i<n;i++){
+		console.log(arguments[i]);
+	}
+}
+
+generate_graph();
+
+
+</script>
